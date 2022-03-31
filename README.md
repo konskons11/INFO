@@ -1,6 +1,6 @@
 All scripts and files utilized for virome analysis are deposited in this directory.
 
-NCBI-search.sh -> Extraction of host and geographic origin data of virus protein sequences.
+NCBI-search.sh -> Bash shell script for extraction of host and geographic origin data of NCBI virus protein sequences.
 
-chord.csv, chord2.txt, circlize.R -> Chord Diagram of highly similar variants of viruses in two or more mosquito species.
+chord.csv, chord2.txt, circlize.R -> R script and files for generating Chord Diagram of highly similar variants of viruses in two or more mosquito species.
 
