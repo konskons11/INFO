@@ -1,2 +1,1 @@
-- 👋 Hi, I’m @konskons11
-- 👀 I’m interested in Bioinformatics & Computational Biology
+All scripts and files used for mosquito virome analysis are deposited in this directory.
