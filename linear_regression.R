@@ -2,7 +2,7 @@
 setwd("/mnt/14C608D4C608B7CE/blast/regres/")
 
 # INPUT DATA
-reg<- read.csv("X.tsv", header=F, as.is=T, check.names=FALSE, sep='\t')
+reg<- read.csv("linear_reg.tsv", header=F, as.is=T, check.names=FALSE, sep='\t')
 fit=lm(mosquito_individuals_ratio~NGS_reads_ratio,data=reg)
 summary(fit)
 
