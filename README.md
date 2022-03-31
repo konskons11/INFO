@@ -2,5 +2,5 @@ All scripts and files utilized for virome analysis are deposited in this directo
 
 NCBI-search.sh -> Extraction of host and geographic origin data of virus protein sequences.
 
-Chord Diagram of highly similar variants of viruses in two or more mosquito species.
+chord.csv, chord2.txt, circlize.R -> Chord Diagram of highly similar variants of viruses in two or more mosquito species.
 
