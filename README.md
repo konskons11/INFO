@@ -1,1 +1,1 @@
-All scripts and files used for mosquito virome analysis are deposited in this directory.
+All scripts and files utilized for virome analysis are deposited in this directory.
