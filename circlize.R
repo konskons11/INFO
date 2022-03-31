@@ -1,5 +1,5 @@
 # CHANGE THIS TO SET YOUR WORKING DIRECTORY
-setwd("/mnt/14C608D4C608B7CE/blast/sankey/")
+setwd("/mnt/14C608D4C608B7CE/blast/chordgram/")
 
 # IMPORT LIBRARY
 library(circlize)
