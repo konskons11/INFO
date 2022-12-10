@@ -12,61 +12,88 @@ output="$2"
 
 extension="${input##*.}"
 if [[ $extension == "fasta" ]] ; then
-        filename=$(basename $input .fasta)
+	filename=$(basename $input .fasta)
 elif [[ $extension == "fa" ]] ; then
-        filename=$(basename $input .fa)
+	filename=$(basename $input .fa)
 elif [[ $extension == "txt" ]] ; then
-        filename=$(basename $input .txt)
+	filename=$(basename $input .txt)
 else
-        exit
+	exit
 fi
+
 
 
 ### FASTA DATA EXTRACTION
-seqs=""
-seqIDs=""
-parse_check=$(awk 'NR%2!=0' "$input")
-parse_check=$(wc -l <<< "$parse_check")
-validity=$(grep ">" <<< "$parse_check" | wc -l)
+parse_check=$(awk 'NR%2==0' $input | wc -l)
+validity=$(grep ">" $input | wc -l)
 
 if [ $parse_check -eq $validity ] ; then
-        seqs=$(awk  'NR%2==0' "$input")
+        seqs=$(awk  'NR%2==0' $input)
 else
-	parsed=$(awk '/^>/{print (NR==1)?$0:"\n"$0;next}{printf "%s", $0}END{print ""}' "$input" )
-        seqs=$(awk 'NR%2==0'  <<< "$parsed")
+	parsed=$(seqtk seq -S $input)
+        seqs=$(awk 'NR%2==0' <<< "$parsed")
 fi
-seqIDs=$(grep ">" "$input" )
+AccIDs=$(grep ">" $input | awk '{print $1}' | sed 's/>//g' )
 
-title=$(  grep -o '\[.*]' <<< "$seqIDs" | sed 's/\[//g' | sed 's/\]//g' | sed 's/ /_/g' | sed 's/-/_/g' )
-AccIDs=$(awk '{print $1}' <<< "$seqIDs" | sed 's/\>//g')
-
-
-
-### COLUMNATE FASTA DATA, FILTER-OUT DUPLICATES & EXPORT NEW FASTA 
-tsv=$(paste  <(echo "$title") <(echo "$AccIDs") <(echo "$seqs") )
-
-unique=$(cat -n <<< "$tsv" | sort -u -k2,2 | sort -nk1 | cut -f2- )
-
-uniq_title=$(awk '{print ">"$1}' <<< "$unique" )
-uniq_AccIDs=$(awk '{print $2}' <<< "$unique" )
-uniq_seqs=$(awk '{print $3}' <<< "$unique" )
+seq_type_prompt="Please enter type of query sequences:
+0=Exit, 1=Protein, 2=Nucleotide"
+while true ; do
+	echo "$seq_type_prompt"
+	read seq_type_input
+	if [ "$seq_type_input" -eq "$seq_type_input" 2> /dev/null ] && [ "$seq_type_input" -eq 0 ] ; then
+		exit
+	elif [ "$seq_type_input" -eq "$seq_type_input" 2> /dev/null ] && [ "$seq_type_input" -ge 1 -a "$seq_type_input" -le 2 ] ; then
+		break
+	fi
+done
 
 
 
-### GET HOST & COUNTRY DETAILS FROM NCBI & EXPORT TO .out FILE
+### GET INFO FROM NCBI & EXPORT TO .out FILE
 echo "Fetching NCBI data, please wait..."
 
-id=$(tr '\n' ',' <<< "$uniq_AccIDs" )
-ncbi_data=$(efetch -db protein -id $id -format gpc | xtract -insd source host country )
+# PROTEIN
+if [ "$seq_type_input" -eq 1 ] ; then
+	ncbi_data=$(efetch -db protein -id $AccIDs -format gpc) 
+	tsv1=$(xtract -input <(echo "$ncbi_data") -insd source organism host country collection_date )
+	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length -upper INSDSeq_sequence )
+	# Keep only data from corresponsing accession numbers
+	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") | grep -F -f <(cut -d. -f1 <<< "$AccIDs") )
+	echo -e "AccessionID\tOrganism\tHost\tCountry\tCollection_date\tSubmission_date\tTitle\tTaxonomy\tSeq_length\tSequence\n$total_tsv" > $output/$filename\_NCBI.out
 
-echo -e "AccessionID\tHost\tCountry\n$ncbi_data" > $output/$filename\_NCBI.out
+# NUCLEOTIDE
+elif [ "$seq_type_input" -eq 2 ] ; then
+	ncbi_data=$(efetch -db nuccore -id $AccIDs -format gbc) 
+	tsv1=$(xtract -input <(echo "$ncbi_data") -insd source organism host country collection_date )
+	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length -upper INSDSeq_sequence )
+	# Keep only data from corresponsing accession numbers
+	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") | grep -F -f <(cut -d. -f1 <<< "$AccIDs") )
+	echo -e "AccessionID\tOrganism\tHost\tCountry\tCollection_date\tSubmission_date\tTitle\tTaxonomy\tSeq_length\tSequence\n$total_tsv" > $output/$filename\_NCBI.out
+
+fi
 
 
-### ADD HOST & COUNTRY DATA TO PREVIOUS NEW_FASTA & EXPORT as .fasta
-ncbi_data=$(awk 'NR>1 {for (i=2 ; i<=NF ; i++) printf "%s_", $i; print ""}' $output/$filename\_NCBI.out | sed 's/.$//g' | sed 's/^-_//g' | sed 's/\._/_/g' | sed 's/:_/_/g' | sed 's/,_/,/g')
 
-final_fasta=$(paste -d'_|\n' <(echo "$uniq_title") <(echo "$uniq_AccIDs") <(echo "$ncbi_data") <(echo "$uniq_seqs"))
-echo "$final_fasta" > $output/$filename.fasta
+### SELECT NCBI DATA TO EXPORT AS FASTA
+data_export_prompt="Please select NCBI data to export:
+0=Exit, 1=Host-Country, 2=Host-Country-Dates"
+while true ; do
+	echo "$data_export_prompt"
+	read data_export_prompt
+	if [ "$data_export_prompt" -eq "$data_export_prompt" 2> /dev/null ] && [ "$data_export_prompt" -eq 0 ] ; then
+		exit
+	elif [ "$data_export_prompt" -eq "$data_export_prompt" 2> /dev/null ] && [ "$data_export_prompt" -eq 1 ] ; then
+		data_to_export='">"$2"_"$1"|"$3"_"$4"\n"$10'
+		break
+	elif [ "$data_export_prompt" -eq "$data_export_prompt" 2> /dev/null ] && [ "$data_export_prompt" -eq 2 ] ; then
+		data_to_export='">"$2"_"$1"|"$3"_"$4"_"$5"_"$6"\n"$10'
+		break
+	fi
+done
+
+
+final_fasta=$(awk -F'\t' 'NR>1 {print '$data_to_export'}' $output/$filename\_NCBI.out | sed 's/\://g' | sed 's/\;//g' | sed 's/\,//g' | sed 's/\[//g' | sed 's/\]//g' | sed 's/ /_/g' )
+echo "$final_fasta" > $output/$filename\_NCBI.fasta
 
 echo "PROCESS COMPLETE!!!"
 
