@@ -28,12 +28,15 @@ parse_check=$(awk 'NR%2==0' $input | wc -l)
 validity=$(grep ">" $input | wc -l)
 
 if [ $parse_check -eq $validity ] ; then
-        seqs=$(awk  'NR%2==0' $input)
+    seqs=$(awk  'NR%2==0' $input)
 else
 	parsed=$(seqtk seq -S $input)
-        seqs=$(awk 'NR%2==0' <<< "$parsed")
+    seqs=$(awk 'NR%2==0' <<< "$parsed")
 fi
 AccIDs=$(grep ">" $input | awk '{print $1}' | sed 's/>//g' )
+
+# Make tabular fasta for later use
+tab_fasta=$(paste <(echo "$AccIDs") <(echo "$seqs"))
 
 seq_type_prompt="Please enter type of query sequences:
 0=Exit, 1=Protein, 2=Nucleotide"
@@ -56,18 +59,18 @@ echo "Fetching NCBI data, please wait..."
 if [ "$seq_type_input" -eq 1 ] ; then
 	ncbi_data=$(efetch -db protein -id $AccIDs -format gpc) 
 	tsv1=$(xtract -input <(echo "$ncbi_data") -insd source organism host country collection_date )
-	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length -upper INSDSeq_sequence )
+	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length )
 	# Keep only data from corresponsing accession numbers
-	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") | grep -F -f <(cut -d. -f1 <<< "$AccIDs") )
+	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") <(awk -F'\t' 'NR==FNR { id[$1]=$1 ; seq[$1]=$2 ; next } ($1 in id ){ print seq[$1]}' OFS="\t" <(echo "$tab_fasta") <(echo "$tsv1") ) )
 	echo -e "AccessionID\tOrganism\tHost\tCountry\tCollection_date\tSubmission_date\tTitle\tTaxonomy\tSeq_length\tSequence\n$total_tsv" > $output/$filename\_NCBI.out
 
 # NUCLEOTIDE
 elif [ "$seq_type_input" -eq 2 ] ; then
 	ncbi_data=$(efetch -db nuccore -id $AccIDs -format gbc) 
 	tsv1=$(xtract -input <(echo "$ncbi_data") -insd source organism host country collection_date )
-	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length -upper INSDSeq_sequence )
+	tsv2=$(xtract -input <(echo "$ncbi_data") -pattern INSDSeq -element INSDSeq_create-date INSDSeq_definition INSDSeq_taxonomy INSDSeq_length )
 	# Keep only data from corresponsing accession numbers
-	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") | grep -F -f <(cut -d. -f1 <<< "$AccIDs") )
+	total_tsv=$(paste <(echo "$tsv1") <(echo "$tsv2") <(awk -F'\t' 'NR==FNR { id[$1]=$1 ; seq[$1]=$2 ; next } ($1 in id ){ print seq[$1]}' OFS="\t" <(echo "$tab_fasta") <(echo "$tsv1") ) )
 	echo -e "AccessionID\tOrganism\tHost\tCountry\tCollection_date\tSubmission_date\tTitle\tTaxonomy\tSeq_length\tSequence\n$total_tsv" > $output/$filename\_NCBI.out
 
 fi
